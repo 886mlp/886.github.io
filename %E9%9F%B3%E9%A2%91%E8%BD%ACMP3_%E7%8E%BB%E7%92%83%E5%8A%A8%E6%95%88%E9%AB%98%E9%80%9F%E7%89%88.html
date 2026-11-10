@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080b12">
+<title>音频转 MP3 · 玻璃动效高速转换</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0c0e'/%3E%3Cg stroke='%23f5b73d' stroke-width='2.2' stroke-linecap='round'%3E%3Cline x1='8' y1='14' x2='8' y2='18'/%3E%3Cline x1='12.5' y1='10' x2='12.5' y2='22'/%3E%3Cline x1='17' y1='6.5' x2='17' y2='25.5'/%3E%3Cline x1='21.5' y1='11' x2='21.5' y2='21'/%3E%3Cline x1='26' y1='14.5' x2='26' y2='17.5'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0b0c0e;
+    --panel:#131519;
+    --panel-2:#191c22;
+    --line:#262a31;
+    --line-soft:#1d2025;
+    --text:#e9eaec;
+    --muted:#939aa3;
+    --accent:#f5b73d;
+    --accent-ink:#171204;
+    --ok:#48d39b;
+    --err:#ff7262;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+    font-size:15px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:24px 18px 56px}
+
+  /* ===== 顶部 ===== */
+  header{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .mark{
+    width:42px;height:42px;flex:none;border-radius:12px;
+    background:linear-gradient(180deg,#1c1f24,#14161a);
+    border:1px solid var(--line);display:grid;place-items:center;
+  }
+  .mark svg{width:22px;height:22px;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round;fill:none}
+  .titles{min-width:0}
+  h1{font-size:21px;line-height:1.25;margin:0;font-weight:700;letter-spacing:.2px}
+  h1 span{color:var(--accent)}
+  .sub{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+
+  /* ===== 拖拽区 ===== */
+  .drop{
+    position:relative;overflow:hidden;
+    border:1.5px dashed #3a3f47;border-radius:18px;
+    background:radial-gradient(120% 140% at 50% 0%,#171a1f 0%,#101215 70%);
+    padding:34px 20px 40px;text-align:center;cursor:pointer;
+    transition:border-color .18s,background .18s,transform .18s;
+  }
+  .drop:hover{border-color:#4c535d}
+  .drop.hot{border-color:var(--accent);background:radial-gradient(120% 140% at 50% 0%,#1e1a10 0%,#121316 70%)}
+  .wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:86px;pointer-events:none}
+  .drop-inner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .drop-icon{width:52px;height:52px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;margin-bottom:6px;background:#16181d}
+  .drop-icon svg{width:24px;height:24px;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
+  .drop strong{font-size:16.5px;font-weight:600}
+  .drop .hint{color:var(--muted);font-size:14px}
+  .drop .formats{margin-top:10px;color:#7d848d;font-size:13px;letter-spacing:.4px}
+  #picker{display:none}
+
+  /* ===== 参数 ===== */
+  .cfg{
+    display:grid;grid-template-columns:1fr;gap:10px;margin-top:16px;
+  }
+  .field{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;
+    padding:10px 12px;min-height:52px;
+  }
+  .field>span{color:var(--muted);font-size:14px;flex:none}
+  select{
+    flex:1;min-width:0;
+    background:#0f1114;color:var(--text);border:1px solid var(--line);
+    border-radius:9px;padding:8px 10px;font-size:15px;font-family:inherit;
+    appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23939aa3' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 11px center;
+    padding-right:30px;
+  }
+  select:focus{outline:2px solid rgba(245,183,61,.45);outline-offset:1px}
+
+  /* ===== 文件列表 ===== */
+  .panel{
+    margin-top:20px;background:var(--panel);border:1px solid var(--line-soft);
+    border-radius:16px;overflow:hidden;
+  }
+  .list-head{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:14px 16px;border-bottom:1px solid var(--line-soft);
+  }
+  .list-head h2{margin:0;font-size:14px;font-weight:600;letter-spacing:.6px;color:#c8ccd2}
+  .count{color:var(--muted);font-size:13.5px;font-variant-numeric:tabular-nums}
+  .rows{display:flex;flex-direction:column}
+  .empty{
+    padding:34px 16px;text-align:center;color:#767d86;font-size:14px;
+  }
+
+  .row{
+    display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;
+    padding:14px 14px 13px;border-bottom:1px solid var(--line-soft);
+    position:relative;
+  }
+  .row:last-child{border-bottom:none}
+  .badge{
+    width:46px;height:46px;flex:none;border-radius:10px;display:grid;place-items:center;
+    background:#0f1114;border:1px solid var(--line);
+    font-size:10.5px;font-weight:700;letter-spacing:.3px;color:#aeb4bc;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  .badge.on{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+  .badge.bad{color:#ffb3ab;border-color:#582c28;background:#241413}
+  .meta{min-width:0}
+  .name{
+    font-size:14.5px;font-weight:500;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;direction:ltr;
+  }
+  .sub{font-size:13.5px;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub.ok{color:var(--ok)}
+  .sub.bad{color:var(--err)}
+  .bar{height:3px;background:#22262c;border-radius:2px;overflow:hidden;margin-top:8px;display:none}
+  .bar.on{display:block}
+  .bar i{display:block;height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width .16s linear}
+  .tail{display:flex;align-items:center;gap:6px}
+  .icon-btn{
+    width:40px;height:40px;min-width:40px;border-radius:10px;border:1px solid var(--line);
+    background:#15181c;color:#b9bfc7;display:grid;place-items:center;cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;
+  }
+  .icon-btn:hover{background:#1d2127;color:#fff}
+  .icon-btn:active{transform:scale(.96)}
+  .icon-btn svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .dl-btn{
+    display:none;height:40px;padding:0 14px;border-radius:10px;border:1px solid rgba(72,211,155,.4);
+    background:rgba(72,211,155,.1);color:var(--ok);font-size:14px;font-weight:600;
+    cursor:pointer;font-family:inherit;white-space:nowrap;
+  }
+  .dl-btn.on{display:inline-flex;align-items:center;gap:6px}
+  .dl-btn:hover{background:rgba(72,211,155,.18)}
+  .dl-btn svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ===== 操作条 ===== */
+  .actions{
+    display:flex;flex-wrap:wrap;gap:10px;padding:14px 16px;
+    border-top:1px solid var(--line-soft);background:#101317;
+  }
+  .btn{
+    flex:1 1 auto;min-width:132px;min-height:48px;border-radius:12px;border:1px solid var(--line);
+    background:#181c21;color:var(--text);font-size:15px;font-weight:600;font-family:inherit;
+    cursor:pointer;transition:background .15s,border-color .15s,opacity .15s;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .btn:hover{background:#20242b}
+  .btn.primary{
+    background:var(--accent);border-color:var(--accent);color:var(--accent-ink);
+  }
+  .btn.primary:hover{background:#ffc552}
+  .btn:disabled{opacity:.42;cursor:not-allowed}
+  .btn svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ===== 底部说明 ===== */
+  .notes{margin-top:22px;color:#7d848d;font-size:13.5px;line-height:1.75}
+  .notes h3{font-size:12px;letter-spacing:1.2px;color:#666d76;font-weight:600;margin:0 0 8px}
+  .notes p{margin:0 0 6px}
+  .tag{
+    display:inline-block;border:1px solid var(--line);border-radius:6px;padding:1px 7px;
+    font-size:12px;color:#98a0a9;margin:0 4px 4px 0;font-family:ui-monospace,monospace;
+  }
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,18px);
+    background:#f5f7f9;color:#14161a;font-size:14px;font-weight:600;
+    padding:10px 18px;border-radius:11px;box-shadow:0 10px 30px rgba(0,0,0,.45);
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  @media (min-width:768px){
+    .wrap{padding:40px 28px 72px}
+    h1{font-size:26px}
+    .sub{font-size:14px}
+    .drop{padding:48px 24px 56px}
+    .cfg{grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+    .field{flex-direction:column;align-items:stretch;gap:6px;padding:12px 14px;min-height:0}
+    .field>span{font-size:13px;letter-spacing:.3px}
+    select{font-size:15.5px;padding:10px 12px;padding-right:32px}
+    .row{padding:16px 18px}
+    .badge{width:52px;height:52px;font-size:11px}
+    .name{font-size:15px}
+    .sub{font-size:13.5px}
+    .notes{font-size:14px}
+  }
+
+  /* ===== 玻璃质感与流畅动效 ===== */
+  :root{
+    --bg:#080b12;--panel:rgba(18,24,36,.66);--panel-2:rgba(25,34,49,.68);
+    --line:rgba(190,210,238,.17);--line-soft:rgba(190,210,238,.11);
+    --text:#eef4ff;--muted:#9baac0;--accent:#f5c56b;--ok:#58e0ad;
+    --glass-shadow:0 22px 70px rgba(0,0,0,.28);
+  }
+  html{min-height:100%;background:#080b12}
+  body{
+    min-height:100vh;overflow-x:hidden;
+    background:radial-gradient(ellipse at 12% 8%,rgba(48,103,168,.24),transparent 34%),
+               radial-gradient(ellipse at 88% 18%,rgba(139,83,190,.18),transparent 30%),
+               radial-gradient(ellipse at 50% 95%,rgba(36,128,139,.14),transparent 36%),#080b12;
+    background-attachment:fixed;
+  }
+  body::before,body::after{content:"";position:fixed;z-index:-1;pointer-events:none;border-radius:50%;filter:blur(65px);opacity:.26;animation:orbFloat 18s ease-in-out infinite alternate}
+  body::before{width:300px;height:300px;left:-120px;top:20%;background:#2467a8}
+  body::after{width:340px;height:340px;right:-150px;bottom:5%;background:#71409a;animation-delay:-8s}
+  .wrap{position:relative;max-width:980px;padding-top:34px}
+  header{gap:14px;align-items:center;margin-bottom:26px}
+  .mark,.drop-icon,.badge,.icon-btn,.field,.panel,.glass-notes{
+    backdrop-filter:blur(18px) saturate(145%);-webkit-backdrop-filter:blur(18px) saturate(145%);
+  }
+  .mark{background:linear-gradient(145deg,rgba(255,255,255,.14),rgba(255,255,255,.035));border-color:var(--line);box-shadow:0 8px 28px rgba(0,0,0,.2),inset 0 1px rgba(255,255,255,.12)}
+  h1{letter-spacing:.35px}
+  h1 span{background:linear-gradient(100deg,#ffe3a2,#f3b94d 58%,#f5d18c);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .engine-pill{margin-left:auto;display:inline-flex;align-items:center;gap:9px;padding:8px 12px;border:1px solid rgba(150,190,226,.18);border-radius:999px;background:rgba(17,27,42,.54);color:#c4d5ea;font-size:12px;white-space:nowrap;box-shadow:inset 0 1px rgba(255,255,255,.07)}
+  .engine-pill i{width:7px;height:7px;border-radius:50%;background:#65e0a7;box-shadow:0 0 12px rgba(101,224,167,.8);display:block}
+  .engine-pill.loading i{background:#f5c56b;box-shadow:0 0 12px rgba(245,197,107,.8);animation:pulseDot 1s ease-in-out infinite}
+  .engine-pill.error i{background:#ff796f;box-shadow:0 0 12px rgba(255,121,111,.6)}
+  .drop{border:1px dashed rgba(179,207,241,.36);border-radius:24px;padding:42px 20px 48px;
+    background:linear-gradient(145deg,rgba(27,44,66,.72),rgba(15,22,35,.65));
+    box-shadow:var(--glass-shadow),inset 0 1px rgba(255,255,255,.11);isolation:isolate;
+    transition:transform .28s cubic-bezier(.2,.8,.2,1),border-color .28s,box-shadow .28s,background .28s}
+  .drop::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:linear-gradient(115deg,transparent 15%,rgba(255,255,255,.075) 38%,transparent 62%);transform:translateX(-120%);transition:transform .8s ease}
+  .drop:hover{transform:translateY(-2px);border-color:rgba(245,197,107,.62);box-shadow:0 26px 80px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.14)}
+  .drop:hover::after{transform:translateX(120%)}
+  .drop.hot{border-color:var(--accent);background:linear-gradient(145deg,rgba(74,57,30,.57),rgba(18,24,36,.78));transform:scale(1.006)}
+  .drop-icon{background:rgba(255,255,255,.075);border-color:rgba(220,235,255,.2);box-shadow:inset 0 1px rgba(255,255,255,.13),0 8px 28px rgba(0,0,0,.18)}
+  .drop-icon svg{filter:drop-shadow(0 0 8px rgba(245,197,107,.35))}
+  .drop strong{letter-spacing:.2px}
+  .drop .formats{color:#a2b2c7;max-width:680px;line-height:1.8}
+  .cfg{gap:12px;margin-top:16px}
+  .field{background:rgba(22,31,46,.58);border:1px solid var(--line-soft);border-radius:15px;box-shadow:inset 0 1px rgba(255,255,255,.055);transition:border-color .2s,transform .2s,background .2s}
+  .field:hover{border-color:rgba(178,205,235,.25);transform:translateY(-1px);background:rgba(28,40,58,.68)}
+  select{background-color:rgba(7,13,23,.72);border-color:rgba(185,207,235,.18);color:#eff5ff}
+  select option{background:#111a29;color:#eef4ff}
+  .panel{background:rgba(15,23,36,.67);border:1px solid var(--line);border-radius:19px;box-shadow:var(--glass-shadow),inset 0 1px rgba(255,255,255,.07)}
+  .list-head{border-bottom-color:var(--line-soft)}
+  .list-head h2{color:#dce8f7}
+  .row{border-bottom-color:var(--line-soft);transition:background .2s}
+  .row:hover{background:rgba(255,255,255,.025)}
+  .badge{background:rgba(8,14,24,.68);border-color:rgba(184,207,238,.16)}
+  .icon-btn{background:rgba(255,255,255,.055);border-color:rgba(184,207,238,.15)}
+  .icon-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(205,225,250,.25)}
+  .dl-btn{background:rgba(72,211,155,.12);box-shadow:0 5px 20px rgba(72,211,155,.06)}
+  .actions{background:rgba(8,14,24,.44);border-top-color:var(--line-soft)}
+  .btn{background:rgba(255,255,255,.065);border-color:rgba(190,210,238,.18);box-shadow:inset 0 1px rgba(255,255,255,.07);transition:transform .2s,background .2s,box-shadow .2s,border-color .2s}
+  .btn:hover:not(:disabled){transform:translateY(-2px);background:rgba(255,255,255,.11);box-shadow:0 10px 25px rgba(0,0,0,.18)}
+  .btn.primary{background:linear-gradient(110deg,#f6d18b,#eeb44c);border-color:rgba(255,227,173,.7);box-shadow:0 8px 25px rgba(220,160,65,.17),inset 0 1px rgba(255,255,255,.45)}
+  .btn.primary:hover:not(:disabled){background:linear-gradient(110deg,#ffe0a7,#f5c46e);box-shadow:0 12px 32px rgba(220,160,65,.25)}
+  .glass-notes{padding:17px 18px;border:1px solid var(--line-soft);border-radius:16px;background:rgba(15,23,36,.43);box-shadow:inset 0 1px rgba(255,255,255,.045)}
+  .notes h3{color:#93a7c1}
+  .notes p{color:#9eacc0}
+  .notes strong{color:#dce8f7}
+  .tag{background:rgba(255,255,255,.04);border-color:rgba(190,210,238,.13);color:#bdcce0}
+  .toast{background:rgba(241,247,255,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 12px 36px rgba(0,0,0,.35)}
+  .bar{background:rgba(255,255,255,.11)}
+  .bar i{background:linear-gradient(90deg,#f0b64d,#ffe2a2);box-shadow:0 0 10px rgba(245,197,107,.32)}
+  @keyframes orbFloat{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(34px,-26px,0) scale(1.13)}}
+  @keyframes pulseDot{50%{opacity:.42;transform:scale(.78)}}
+  @media(max-width:560px){
+    .wrap{padding:22px 14px 42px}header{flex-wrap:wrap;row-gap:12px}.engine-pill{margin-left:54px;margin-top:-8px}
+    .drop{padding:34px 15px 40px;border-radius:20px}.drop .formats{font-size:11.5px}.actions{padding:12px;gap:8px}.btn{min-width:calc(50% - 4px);font-size:14px}.btn.primary{min-width:100%}
+  }
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== 页头 ===== -->
+  <header>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><line x1="4" y1="10" x2="4" y2="14"/><line x1="8" y1="6" x2="8" y2="18"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="16" y1="7" x2="16" y2="17"/><line x1="20" y1="10" x2="20" y2="14"/></svg>
+    </div>
+    <div class="titles">
+      <h1>音频转 <span>MP3</span></h1>
+      <p class="sub">本地高速转换 · 支持音频与视频提取 · 文件不上传</p>
+    </div>
+    <div class="engine-pill" id="engineStatus" aria-live="polite"><i></i><span id="engineStatusText">快速模式就绪</span></div>
+  </header>
+
+  <!-- ===== 投放区 ===== -->
+  <section class="drop" id="drop" role="button" tabindex="0" aria-label="选择或拖入音频文件">
+    <svg class="wave" id="wave" aria-hidden="true" preserveAspectRatio="none"><path d=""/></svg>
+    <div class="drop-inner">
+      <div class="drop-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      </div>
+      <strong>拖拽音频到这里</strong>
+      <span class="hint">或点击选择文件，支持批量添加；也可拖入视频提取音轨</span>
+      <span class="formats">MP3 · WAV · FLAC · M4A · AAC · OGG · OPUS · WMA · APE · AMR · MP4 · MKV · MOV · WEBM</span>
+    </div>
+    <input type="file" id="picker" multiple accept="audio/*,video/*,.mp3,.wav,.wave,.flac,.m4a,.m4b,.m4p,.aac,.ogg,.oga,.opus,.aiff,.aif,.aifc,.caf,.webm,.wma,.ape,.amr,.ac3,.mka,.mp4,.m4v,.mkv,.mov,.avi,.wmv,.flv,.3gp,.mpeg,.mpg,.ts,.m2ts,.wv,.tta,.tak,.dsf,.dff">
+  </section>
+
+  <!-- ===== 输出参数 ===== -->
+  <div class="cfg">
+    <label class="field">
+      <span>输出码率</span>
+      <select id="bitrate">
+        <option value="96">96 kbps · 体积最小</option>
+        <option value="128">128 kbps · 标准</option>
+        <option value="192" selected>192 kbps · 推荐</option>
+        <option value="256">256 kbps · 高质量</option>
+        <option value="320">320 kbps · 最高</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>采样率</span>
+      <select id="samplerate">
+        <option value="44100" selected>44.1 kHz · 标准</option>
+        <option value="48000">48 kHz</option>
+        <option value="32000">32 kHz</option>
+        <option value="22050">22.05 kHz · 小体积</option>
+        <option value="auto">跟随原文件</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>声道</span>
+      <select id="channels">
+        <option value="keep" selected>保留原声道</option>
+        <option value="stereo">强制立体声</option>
+        <option value="mono">强制单声道</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- ===== 文件列表 ===== -->
+  <section class="panel">
+    <div class="list-head">
+      <h2>文件列表</h2>
+      <span class="count" id="count">暂无文件</span>
+    </div>
+    <div class="rows" id="rows"></div>
+    <div class="empty" id="empty">拖入或选择音频文件后，会出现在这里</div>
+    <div class="actions">
+      <button class="btn primary" id="btnStart">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg><span>开始转换</span>
+      </button>
+      <button class="btn" id="btnZip" disabled>
+        <svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M4 19h16"/></svg><span>全部下载</span>
+      </button>
+      <button class="btn" id="btnClear" disabled>
+        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/></svg><span>清空列表</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===== 说明 ===== -->
+  <div class="notes glass-notes">
+    <h3>转换说明</h3>
+    <p><strong>双引擎工作：</strong>浏览器原生解码优先走快速路径；遇到浏览器不认识的容器或编码时，自动调用 FFmpeg WebAssembly 兼容引擎。FFmpeg 首次加载需要联网下载约数十 MB 组件，后续通常可由浏览器缓存。</p>
+    <p><strong>支持范围：</strong><span class="tag">MP3</span><span class="tag">WAV</span><span class="tag">FLAC</span><span class="tag">M4A</span><span class="tag">AAC</span><span class="tag">OGG</span><span class="tag">OPUS</span><span class="tag">WMA</span><span class="tag">APE</span><span class="tag">AMR</span><span class="tag">AC3</span><span class="tag">MP4</span><span class="tag">MKV</span><span class="tag">MOV</span><span class="tag">WEBM</span></p>
+    <p><strong>转换速度：</strong>使用设备本地处理，不需要上传等待；在支持跨源隔离的部署环境中会尝试多线程 FFmpeg，否则自动使用兼容性更好的单线程模式。速度仍取决于设备性能、文件长度和格式。</p>
+    <p><strong>文件与水印：</strong>网页不会给导出的 MP3 添加平台标识或宣传水印。不会擅自抹除原始媒体内容中的版权水印或声音标记。</p>
+    <p><strong>格式边界：</strong>常见音视频格式覆盖面较广，但无法承诺所有专有、损坏或加密格式都能解码；MIDI 属于乐谱数据，需要音源合成，不能保证直接转成有声音的 MP3。</p>
+    <p><strong>大文件提示：</strong>本地浏览器转换受设备内存限制。超大文件建议使用桌面浏览器；不要在转换过程中关闭页面。</p>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://fastly.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<script src="https://fastly.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== 基础工具 ===== */
+  var $ = function (id) { return document.getElementById(id); };
+  var dropEl = $("drop"), picker = $("picker"), rowsEl = $("rows"), emptyEl = $("empty");
+  var countEl = $("count"), toastEl = $("toast");
+  var btnStart = $("btnStart"), btnZip = $("btnZip"), btnClear = $("btnClear");
+  var selBitrate = $("bitrate"), selRate = $("samplerate"), selCh = $("channels");
+
+  var RATES = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000];
+  var S = { items: [], uid: 0, running: false, activeFFmpegItem: null };
+  var ctx = null;
+  var ffmpegEngine = null;
+  var ffmpegLoadPromise = null;
+  var lameWorker = null;
+  var lameWorkerUrl = null;
+  var engineStatus = $("engineStatus");
+  var engineStatusText = $("engineStatusText");
+
+  function setEngineStatus(text, mode) {
+    if (engineStatusText) engineStatusText.textContent = text;
+    if (engineStatus) engineStatus.className = "engine-pill" + (mode ? " " + mode : "");
+  }
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("on");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toastEl.classList.remove("on"); }, 2200);
+  }
+
+  function fmtSize(bytes) {
+    if (!bytes) return "0 B";
+    var u = ["B", "KB", "MB", "GB"], i = 0, n = bytes;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    var d = (i > 0 && n < 100) ? 1 : 0;
+    return n.toFixed(d) + " " + u[i];
+  }
+
+  function fmtDur(sec) {
+    if (!sec || !isFinite(sec)) return "";
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return m + ":" + (s < 10 ? "0" + s : s);
+  }
+
+  function tick(ms) {
+    return new Promise(function (r) { setTimeout(r, ms || 0); });
+  }
+
+  /* ===== 顶部装饰波形 ===== */
+  (function drawWave() {
+    var W = 1200, H = 120, mid = H / 2, d = "M0 " + mid;
+    for (var x = 0; x <= W; x += 10) {
+      var t = x / W;
+      var env = Math.pow(Math.sin(Math.PI * t), 0.55);
+      var y = mid + env * (Math.sin(t * 26) * 0.55 + Math.sin(t * 9.1) * 0.9 + Math.sin(t * 63) * 0.28) * 30;
+      d += " L" + x + " " + y.toFixed(1);
+    }
+    var path = document.querySelector("#wave path");
+    path.setAttribute("d", d);
+    path.style.cssText = "fill:none;stroke:rgba(245,183,61,.28);stroke-width:1.6";
+  })();
+
+  /* ===== 音频上下文与解码 ===== */
+  function getCtx() {
+    if (ctx) {
+      if (ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} }
+      return ctx;
+    }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    try { ctx = new AC({ sampleRate: 44100 }); }
+    catch (e) { ctx = new AC(); }
+    return ctx;
+  }
+
+  function decodeAudio(arrayBuffer) {
+    var c = getCtx();
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      function ok(b) { if (!settled) { settled = true; resolve(b); } }
+      function bad(e) { if (!settled) { settled = true; reject(e); } }
+      try {
+        var p = c.decodeAudioData(arrayBuffer, ok, bad);
+        if (p && typeof p.then === "function") p.then(ok, bad);
+      } catch (e) { bad(e); }
+    });
+  }
+
+  function snapRate(r) {
+    var best = RATES[0];
+    for (var i = 0; i < RATES.length; i++) {
+      if (Math.abs(RATES[i] - r) < Math.abs(best - r)) best = RATES[i];
+    }
+    return best;
+  }
+
+  function resample(data, from, to) {
+    if (from === to) return data;
+    var ratio = from / to;
+    var len = Math.max(1, Math.floor(data.length / ratio));
+    var out = new Float32Array(len);
+    for (var i = 0; i < len; i++) {
+      var pos = i * ratio;
+      var i0 = Math.floor(pos);
+      var i1 = i0 + 1 < data.length ? i0 + 1 : data.length - 1;
+      var t = pos - i0;
+      out[i] = data[i0] * (1 - t) + data[i1] * t;
+    }
+    return out;
+  }
+
+  function prepChannels(buffer, targetCh, targetRate) {
+    var chans = [];
+    for (var c = 0; c < buffer.numberOfChannels; c++) chans.push(buffer.getChannelData(c));
+
+    if (targetCh === 1 && chans.length > 1) {
+      var len = chans[0].length, mono = new Float32Array(len);
+      for (var i = 0; i < len; i++) {
+        var sum = 0;
+        for (var k = 0; k < chans.length; k++) sum += chans[k][i];
+        mono[i] = sum / chans.length;
+      }
+      chans = [mono];
+    } else if (targetCh === 2 && chans.length === 1) {
+      chans = [chans[0], chans[0].slice(0)];
+    } else {
+      chans = chans.slice(0, targetCh);
+    }
+
+    if (targetRate && targetRate !== buffer.sampleRate) {
+      chans = chans.map(function (d) { return resample(d, buffer.sampleRate, targetRate); });
+    }
+    return chans;
+  }
+
+  function toInt16(f32) {
+    var out = new Int16Array(f32.length);
+    for (var i = 0; i < f32.length; i++) {
+      var s = f32[i];
+      if (s > 1) s = 1; else if (s < -1) s = -1;
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return out;
+  }
+
+  /* ===== MP3 编码 Worker：将重编码计算移出 UI 主线程 ===== */
+  function getLameWorker() {
+    if (lameWorker) return lameWorker;
+    if (typeof Worker === "undefined" || typeof Blob === "undefined") return null;
+    var workerSource = `
+      importScripts("https://fastly.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js");
+      function toI16(src) {
+        var out = new Int16Array(src.length);
+        for (var i = 0; i < src.length; i++) {
+          var v = src[i];
+          if (v > 1) v = 1; else if (v < -1) v = -1;
+          out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+        }
+        return out;
+      }
+      self.onmessage = function (event) {
+        var data = event.data || {};
+        if (data.type !== "encode") return;
+        try {
+          var chans = data.channels.map(function (a) { return new Float32Array(a); });
+          var Encoder = self.lamejs && self.lamejs.Mp3Encoder;
+          if (!Encoder) throw new Error("Worker 中的 MP3 编码器未加载");
+          var enc = new Encoder(chans.length, data.rate, data.kbps);
+          var left = toI16(chans[0]);
+          var right = chans.length > 1 ? toI16(chans[1]) : null;
+          var total = left.length, block = 1152, parts = [], last = Date.now();
+          for (var i = 0; i < total; i += block) {
+            var end = Math.min(i + block, total);
+            var buf = right ? enc.encodeBuffer(left.subarray(i, end), right.subarray(i, end)) : enc.encodeBuffer(left.subarray(i, end));
+            if (buf && buf.length) parts.push(new Uint8Array(buf.buffer, buf.byteOffset, buf.length));
+            if (Date.now() - last > 70) {
+              last = Date.now();
+              self.postMessage({ type: "progress", progress: i / total });
+            }
+          }
+          var tail = enc.flush();
+          if (tail && tail.length) parts.push(new Uint8Array(tail.buffer, tail.byteOffset, tail.length));
+          var size = 0;
+          for (var j = 0; j < parts.length; j++) size += parts[j].length;
+          var merged = new Uint8Array(size), offset = 0;
+          for (var k = 0; k < parts.length; k++) { merged.set(parts[k], offset); offset += parts[k].length; }
+          self.postMessage({ type: "done", buffer: merged.buffer }, [merged.buffer]);
+        } catch (err) {
+          self.postMessage({ type: "error", message: (err && err.message) || String(err) });
+        }
+      };
+    `;
+    lameWorkerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+    try {
+      lameWorker = new Worker(lameWorkerUrl);
+      return lameWorker;
+    } catch (err) {
+      try { URL.revokeObjectURL(lameWorkerUrl); } catch (_) {}
+      lameWorkerUrl = null;
+      lameWorker = null;
+      return null;
+    }
+  }
+
+  function encodeMp3InWorker(chans, rate, kbps, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var worker = getLameWorker();
+      if (!worker) { reject(new Error("当前浏览器不支持 Worker")); return; }
+      var finished = false;
+      function cleanup() {
+        worker.onmessage = null;
+        worker.onerror = null;
+      }
+      worker.onmessage = function (event) {
+        var data = event.data || {};
+        if (data.type === "progress") { onProgress(data.progress || 0); return; }
+        if (data.type === "done") {
+          if (finished) return;
+          finished = true; cleanup(); onProgress(1);
+          resolve(new Blob([data.buffer], { type: "audio/mpeg" }));
+        } else if (data.type === "error") {
+          if (finished) return;
+          finished = true; cleanup();
+          reject(new Error(data.message || "Worker MP3 编码失败"));
+        }
+      };
+      worker.onerror = function (event) {
+        if (finished) return;
+        finished = true; cleanup();
+        try { worker.terminate(); } catch (_) {}
+        try { if (lameWorkerUrl) URL.revokeObjectURL(lameWorkerUrl); } catch (_) {}
+        lameWorker = null; lameWorkerUrl = null;
+        reject(new Error((event && event.message) || "Worker 编码不可用"));
+      };
+      try {
+        var transfer = [];
+        // 复制 PCM 再转移给 Worker，保留主线程原数据供异常时回退编码。
+        var copyChannels = chans.map(function (channel) {
+          var view = channel.slice(0);
+          transfer.push(view.buffer);
+          return view;
+        });
+        worker.postMessage({ type: "encode", channels: copyChannels, rate: rate, kbps: kbps }, transfer);
+      } catch (err) {
+        finished = true; cleanup();
+        reject(err);
+      }
+    });
+  }
+
+  async function encodeMp3(chans, rate, kbps, onProgress) {
+    var rawBytes = chans.reduce(function (n, channel) { return n + channel.byteLength; }, 0);
+    // 普通音乐文件走 Worker；超长音频避免复制整段 PCM 导致内存峰值过高。
+    if (typeof Worker !== "undefined" && rawBytes <= 96 * 1024 * 1024) {
+      try {
+        return await encodeMp3InWorker(chans, rate, kbps, onProgress);
+      } catch (workerError) {
+        // Worker/CDN 被浏览器策略拦截时，退回分块主线程编码，保证可用性。
+      }
+    }
+    return await encodeMp3OnMainThread(chans, rate, kbps, onProgress);
+  }
+
+  /* ===== 兼容回退：分块编码并定期让出主线程 ===== */
+  async function encodeMp3OnMainThread(chans, rate, kbps, onProgress) {
+    var enc = new window.lamejs.Mp3Encoder(chans.length, rate, kbps);
+    var total = chans[0].length;
+    var left = toInt16(chans[0]);
+    var right = chans.length > 1 ? toInt16(chans[1]) : null;
+    var block = 1152, parts = [], last = 0, i, end, l, r, buf;
+
+    for (i = 0; i < total; i += block) {
+      end = Math.min(i + block, total);
+      l = left.subarray(i, end);
+      r = right ? right.subarray(i, end) : null;
+      buf = right ? enc.encodeBuffer(l, r) : enc.encodeBuffer(l);
+      if (buf.length > 0) parts.push(new Uint8Array(buf.buffer, buf.byteOffset, buf.length));
+
+      if (performance.now() - last > 55) {
+        last = performance.now();
+        onProgress(i / total);
+        await tick(0);
+      }
+    }
+
+    var tail = enc.flush();
+    if (tail.length > 0) parts.push(new Uint8Array(tail.buffer, tail.byteOffset, tail.length));
+    onProgress(1);
+    return new Blob(parts, { type: "audio/mpeg" });
+  }
+
+  /* ===== 行渲染 ===== */
+  function buildRow(item) {
+    var el = document.createElement("div");
+    el.className = "row";
+
+    var badge = document.createElement("div");
+    badge.className = "badge";
+
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    var name = document.createElement("div");
+    name.className = "name";
+    name.textContent = item.name;
+    var sub = document.createElement("div");
+    sub.className = "sub";
+    var barWrap = document.createElement("div");
+    barWrap.className = "bar";
+    var bar = document.createElement("i");
+    barWrap.appendChild(bar);
+    meta.appendChild(name);
+    meta.appendChild(sub);
+    meta.appendChild(barWrap);
+
+    var tail = document.createElement("div");
+    tail.className = "tail";
+    var dl = document.createElement("button");
+    dl.className = "dl-btn";
+    dl.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M4 19h16"/></svg>下载';
+    var rm = document.createElement("button");
+    rm.className = "icon-btn";
+    rm.setAttribute("aria-label", "移除");
+    rm.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>';
+    tail.appendChild(dl);
+    tail.appendChild(rm);
+
+    el.appendChild(badge);
+    el.appendChild(meta);
+    el.appendChild(tail);
+
+    dl.addEventListener("click", function () { downloadOne(item); });
+    rm.addEventListener("click", function () {
+      if (item.status === "working") { toast("转换中，请等它结束"); return; }
+      var idx = S.items.indexOf(item);
+      if (idx > -1) S.items.splice(idx, 1);
+      el.remove();
+      refresh();
+    });
+
+    item.dom = { el: el, badge: badge, sub: sub, barWrap: barWrap, bar: bar, dl: dl, rm: rm };
+    return el;
+  }
+
+  function updateRow(item) {
+    var d = item.dom;
+    if (!d) return;
+
+    d.badge.className = "badge" + (item.status === "done" ? " on" : "") + (item.status === "error" ? " bad" : "");
+    d.badge.textContent = item.status === "done" ? "MP3" : (item.ext || "FILE");
+
+    d.sub.className = "sub";
+    d.barWrap.className = "bar";
+    d.dl.className = "dl-btn";
+    d.sub.removeAttribute("title");
+
+    if (item.status === "ready") {
+      d.sub.textContent = fmtSize(item.size) + " · 待转换";
+    } else if (item.status === "working") {
+      d.sub.textContent = item.stage + " " + Math.round(item.progress * 100) + "%";
+      d.barWrap.classList.add("on");
+      d.bar.style.width = (item.progress * 100).toFixed(1) + "%";
+    } else if (item.status === "done") {
+      var diff = item.size > 0 ? Math.round((1 - item.outSize / item.size) * 100) : 0;
+      var extra = diff > 0 ? " · 比原文件小 " + diff + "%" : "";
+      d.sub.textContent = "已转换 · " + fmtSize(item.outSize) + " · " + (item.outRate / 1000) + " kHz / " + item.outKbps + " kbps" + extra;
+      d.sub.classList.add("ok");
+      d.dl.classList.add("on");
+    } else if (item.status === "error") {
+      d.sub.textContent = "失败 · " + item.error;
+      d.sub.classList.add("bad");
+      d.sub.setAttribute("title", item.error);
+      d.barWrap.classList.add("on");
+      d.bar.style.width = "0%";
+      d.dl.classList.remove("on");
+    }
+    d.rm.style.visibility = item.status === "working" ? "hidden" : "visible";
+  }
+
+  /* ===== 列表与操作条 ===== */
+  function refresh() {
+    var items = S.items;
+    emptyEl.style.display = items.length ? "none" : "block";
+
+    var ready = 0, done = 0, totalSize = 0, doneSize = 0;
+    items.forEach(function (it) {
+      totalSize += it.size;
+      if (it.status === "ready" || it.status === "error") ready++;
+      if (it.status === "done") { done++; doneSize += it.outSize; }
+    });
+
+    if (!items.length) countEl.textContent = "暂无文件";
+    else {
+      var txt = items.length + " 个文件 · 原 " + fmtSize(totalSize);
+      if (done) txt += " · 已完成 " + done + "（" + fmtSize(doneSize) + "）";
+      countEl.textContent = txt;
+    }
+
+    btnStart.disabled = S.running || ready === 0;
+    btnZip.disabled = S.running || done === 0;
+    btnClear.disabled = S.running || items.length === 0;
+  }
+
+  function setStartLabel(text, spinning) {
+    var span = btnStart.querySelector("span");
+    if (span) span.textContent = text;
+    btnStart.style.opacity = spinning ? ".7" : "";
+  }
+
+  function addFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    files = files.filter(function (f) { return f && f.size > 0; });
+    if (!files.length) { toast("没有读到有效文件"); return; }
+
+    files.forEach(function (f) {
+      var ext = (f.name.split(".").pop() || "").toUpperCase();
+      if (ext.length > 5) ext = "FILE";
+      var item = {
+        uid: ++S.uid,
+        file: f,
+        name: f.name,
+        ext: ext,
+        size: f.size,
+        status: "ready",
+        stage: "",
+        progress: 0,
+        blob: null,
+        outName: "",
+        outSize: 0,
+        outRate: 0,
+        outKbps: 0,
+        duration: 0,
+        error: "",
+        dom: null
+      };
+      S.items.push(item);
+      var el = buildRow(item);
+      rowsEl.appendChild(el);
+      updateRow(item);
+    });
+
+    refresh();
+    toast(files.length > 1 ? "已添加 " + files.length + " 个文件" : "已添加 1 个文件");
+  }
+
+  /* ===== 转换 ===== */
+  function mapError(err) {
+    var n = (err && err.name) || "";
+    var m = (err && err.message) || String(err || "");
+    if (n === "EncodingError" || n === "NotSupportedError" || /decode|unable to/i.test(m)) {
+      return "该格式无法解码；可检查文件是否损坏或受保护";
+    }
+    if (/allocation|memory|too large/i.test(m)) return "内存不足，文件过长，建议切成短片段";
+    if (/lamejs|not defined|lame/i.test(m)) return "快速编码器未加载，请刷新页面重试";
+    if (/兼容引擎加载失败/i.test(m)) return m;
+    return m ? "转换失败：" + m : "转换失败，未知错误";
+  }
+
+  /* ===== 全格式兼容引擎：仅在浏览器原生解码失败时按需加载 ===== */
+  async function getFFmpeg() {
+    if (ffmpegEngine) return ffmpegEngine;
+    if (ffmpegLoadPromise) return ffmpegLoadPromise;
+    setEngineStatus("正在加载兼容引擎", "loading");
+    toast("首次使用兼容引擎需加载组件，请保持网络连接");
+    ffmpegLoadPromise = (async function () {
+      var pkg = await import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js");
+      var util = await import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js");
+      var ff = new pkg.FFmpeg();
+      var base = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+      var loaded = false;
+
+      // 只有站点已启用 COOP/COEP、浏览器允许 SharedArrayBuffer 时才尝试多线程核心。
+      if (window.crossOriginIsolated && typeof window.SharedArrayBuffer !== "undefined") {
+        try {
+          var mt = "https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.10/dist/umd";
+          await ff.load({
+            coreURL: await util.toBlobURL(mt + "/ffmpeg-core.js", "text/javascript"),
+            wasmURL: await util.toBlobURL(mt + "/ffmpeg-core.wasm", "application/wasm"),
+            workerURL: await util.toBlobURL(mt + "/ffmpeg-core.worker.js", "text/javascript")
+          });
+          loaded = true;
+          setEngineStatus("多线程兼容引擎已就绪", "");
+        } catch (mtError) {
+          // 多线程资源不可用时，自动退回单线程版本。
+          try { if (ff.loaded) ff.terminate(); } catch (_) {}
+          ff = new pkg.FFmpeg();
+        }
+      }
+      if (!loaded) {
+        await ff.load({
+          coreURL: await util.toBlobURL(base + "/ffmpeg-core.js", "text/javascript"),
+          wasmURL: await util.toBlobURL(base + "/ffmpeg-core.wasm", "application/wasm")
+        });
+        setEngineStatus("兼容引擎已就绪", "");
+      }
+      ff.on("progress", function (evt) {
+        var item = S.activeFFmpegItem;
+        if (!item || item.status !== "working" || !evt || !isFinite(evt.progress)) return;
+        var p = Math.max(0, Math.min(1, evt.progress));
+        item.progress = 0.08 + p * 0.88;
+        item.stage = "FFmpeg 转换";
+        updateRow(item);
+      });
+      ffmpegEngine = ff;
+      return ff;
+    })();
+    try {
+      return await ffmpegLoadPromise;
+    } catch (err) {
+      ffmpegLoadPromise = null;
+      setEngineStatus("兼容引擎加载失败", "error");
+      throw new Error("兼容引擎加载失败，请检查网络/CDN 后重试：" + ((err && err.message) || err));
+    }
+  }
+
+  async function convertWithFFmpeg(item, arrayBuffer) {
+    var ff = await getFFmpeg();
+    var ext = (item.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!ext || ext.length > 8) ext = "bin";
+    var inputName = "input_" + item.uid + "." + ext;
+    var outputName = "output_" + item.uid + ".mp3";
+    var kbps = parseInt(selBitrate.value, 10) || 192;
+    var args = ["-hide_banner", "-loglevel", "error", "-y", "-i", inputName,
+      "-map", "0:a:0", "-vn", "-sn", "-dn", "-codec:a", "libmp3lame", "-b:a", kbps + "k"];
+    var rateOpt = selRate.value;
+    if (rateOpt !== "auto") args.push("-ar", String(parseInt(rateOpt, 10)));
+    if (selCh.value === "stereo") args.push("-ac", "2");
+    else if (selCh.value === "mono") args.push("-ac", "1");
+    // 让 FFmpeg 在 Web Worker 内运行，避免重编码时阻塞页面交互。
+    item.stage = "写入转换任务";
+    item.progress = 0.04;
+    updateRow(item);
+    S.activeFFmpegItem = item;
+    try {
+      await ff.writeFile(inputName, new Uint8Array(arrayBuffer));
+      var code = await ff.exec(args.concat([outputName]));
+      if (code !== 0) throw new Error("FFmpeg 无法识别该媒体格式或其中没有可用音轨");
+      var data = await ff.readFile(outputName);
+      var copy = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      var blob = new Blob([copy], { type: "audio/mpeg" });
+      if (!blob.size) throw new Error("没有生成有效 MP3 数据");
+      item.blob = blob;
+      item.outSize = blob.size;
+      item.outName = (item.name.replace(/\.[^./\\]+$/, "") || "audio") + ".mp3";
+      item.outRate = rateOpt === "auto" ? 44100 : parseInt(rateOpt, 10);
+      item.outKbps = kbps;
+      item.outCh = selCh.value === "mono" ? 1 : selCh.value === "stereo" ? 2 : 0;
+      item.status = "done";
+      item.progress = 1;
+      updateRow(item);
+    } finally {
+      S.activeFFmpegItem = null;
+      try { await ff.deleteFile(inputName); } catch (_) {}
+      try { await ff.deleteFile(outputName); } catch (_) {}
+    }
+  }
+
+  async function convertOne(item, index, total) {
+    item.status = "working";
+    item.stage = "读取文件";
+    item.progress = 0;
+    updateRow(item);
+    setStartLabel("转换中 " + (index + 1) + "/" + total, true);
+    refresh();
+
+    try {
+      var ab = await item.file.arrayBuffer();
+      if (!window.lamejs) {
+        // 快速编码器脚本暂不可用时，直接走 FFmpeg 引擎，不阻断任务。
+        await convertWithFFmpeg(item, ab);
+        refresh();
+        return;
+      }
+      item.stage = "快速解码";
+      item.progress = 0.03;
+      updateRow(item);
+      await tick(10);
+
+      var decoded;
+      try {
+        decoded = await decodeAudio(ab.slice(0));
+      } catch (nativeDecodeError) {
+        // 浏览器不支持的编码/容器交给 FFmpeg 兼容引擎处理。
+        await convertWithFFmpeg(item, ab);
+        return;
+      }
+      item.duration = decoded.duration;
+      item.stage = "快速编码 MP3";
+      item.progress = 0.06;
+      updateRow(item);
+
+      var rateOpt = selRate.value;
+      var rate = rateOpt === "auto" ? snapRate(decoded.sampleRate) : parseInt(rateOpt, 10);
+      if (RATES.indexOf(rate) === -1) rate = snapRate(rate);
+
+      var chOpt = selCh.value;
+      var targetCh = chOpt === "mono" ? 1 : chOpt === "stereo" ? 2 : Math.min(2, decoded.numberOfChannels);
+
+      var kbps = parseInt(selBitrate.value, 10);
+      if (rate < 32000) kbps = Math.min(kbps, 160);
+
+      var chans = prepChannels(decoded, targetCh, rate);
+      var blob = await encodeMp3(chans, rate, kbps, function (p) {
+        item.progress = 0.06 + 0.94 * p;
+        updateRow(item);
+      });
+
+      item.blob = blob;
+      item.outSize = blob.size;
+      item.outName = (item.name.replace(/\.[^./\\]+$/, "") || "audio") + ".mp3";
+      item.outRate = rate;
+      item.outKbps = kbps;
+      item.outCh = chans.length;
+      item.status = "done";
+      item.progress = 1;
+      updateRow(item);
+    } catch (err) {
+      item.status = "error";
+      item.error = mapError(err);
+      item.progress = 1;
+      updateRow(item);
+    }
+    refresh();
+  }
+
+  async function convertAll() {
+    if (S.running) return;
+    var queue = S.items.filter(function (i) { return i.status === "ready" || i.status === "error"; });
+    if (!queue.length) { toast("没有待转换的文件"); return; }
+    S.running = true;
+    setEngineStatus("正在转换", "loading");
+    refresh();
+
+    for (var k = 0; k < queue.length; k++) {
+      if (S.items.indexOf(queue[k]) === -1) continue;
+      await convertOne(queue[k], k, queue.length);
+    }
+
+    S.running = false;
+    setStartLabel("开始转换", false);
+    setEngineStatus(ffmpegEngine ? "兼容引擎已缓存" : "快速模式就绪", "");
+
+    var done = 0, fail = 0;
+    S.items.forEach(function (i) { if (i.status === "done") done++; if (i.status === "error") fail++; });
+    refresh();
+
+    if (fail && done) toast("完成 " + done + " 个，失败 " + fail + " 个");
+    else if (fail) toast("转换失败，查看文件行提示");
+    else if (done) toast("转换完成，共 " + done + " 个文件");
+  }
+
+  /* ===== 下载 ===== */
+  function downloadOne(item) {
+    if (!item.blob) return;
+    var url = URL.createObjectURL(item.blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = item.outName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+  }
+
+  async function downloadAll() {
+    var done = S.items.filter(function (i) { return i.status === "done"; });
+    if (!done.length) { toast("还没有可下载的文件"); return; }
+    if (done.length === 1) { downloadOne(done[0]); return; }
+
+    if (typeof window.JSZip === "undefined") {
+      done.forEach(function (it, k) { setTimeout(function () { downloadOne(it); }, k * 800); });
+      toast("正在逐个下载");
+      return;
+    }
+
+    toast("正在打包 " + done.length + " 个文件…");
+    var zip = new window.JSZip();
+    var used = {};
+    done.forEach(function (it) {
+      var n = it.outName;
+      if (used[n]) {
+        used[n] = used[n] + 1;
+        n = n.replace(/\.mp3$/i, "") + " (" + used[n] + ").mp3";
+      } else {
+        used[n] = 1;
+      }
+      zip.file(n, it.blob);
+    });
+
+    var blob = await zip.generateAsync({ type: "blob" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "转换结果_MP3.zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
+    toast("已打包下载");
+  }
+
+  /* ===== 交互绑定 ===== */
+  function openPicker() { picker.click(); }
+
+  dropEl.addEventListener("click", function (e) {
+    if (e.target === picker) return;
+    openPicker();
+  });
+  dropEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPicker(); }
+  });
+  picker.addEventListener("change", function () {
+    addFiles(picker.files);
+    picker.value = "";
+  });
+
+  ["dragenter", "dragover"].forEach(function (ev) {
+    dropEl.addEventListener(ev, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropEl.classList.add("hot");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    dropEl.addEventListener(ev, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ev === "dragleave" && e.target !== dropEl) return;
+      dropEl.classList.remove("hot");
+    });
+  });
+  dropEl.addEventListener("drop", function (e) {
+    if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
+  });
+
+  // 防止拖到页面其他位置时浏览器直接打开文件
+  window.addEventListener("dragover", function (e) { e.preventDefault(); });
+  window.addEventListener("drop", function (e) {
+    e.preventDefault();
+    if (!dropEl.contains(e.target) && e.dataTransfer && e.dataTransfer.files.length) {
+      addFiles(e.dataTransfer.files);
+    }
+  });
+
+  btnStart.addEventListener("click", convertAll);
+  btnZip.addEventListener("click", downloadAll);
+  btnClear.addEventListener("click", function () {
+    if (S.running) { toast("转换中，先等一下"); return; }
+    var hasDone = S.items.some(function (i) { return i.status === "done"; });
+    if (hasDone && !window.confirm("清空后已转换的结果会被丢弃，继续？")) return;
+    S.items = [];
+    rowsEl.innerHTML = "";
+    refresh();
+    toast("已清空列表");
+  });
+
+  refresh();
+})();
+</script>
+</body>
+</html>
